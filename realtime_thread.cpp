@@ -19,7 +19,12 @@ realtime_thread::~realtime_thread() {}
 // this is the main loop called every Ts with high priority
 void realtime_thread::loop(void){
 
-    float K[2] {-0.9603,-0.0611};
+    float K[2] {-0.96029,-0.06110};
+    float K4[4] {-1.67140,-0.15138,-0.00269,0.00162};
+    IIR_filter Integrator(Ts);
+    float M_soll,i_soll;
+    float km = 36.9e-3;
+    float kp = 1; // P-Regler fuer Scheibenregler aus Phasenreserve
     while(1)
         {
         ThisThread::flags_wait_any(threadFlag);
@@ -28,10 +33,16 @@ void realtime_thread::loop(void){
         if(bal_cntrl_enabled)
             {
                 /* Aufgabe 5.1 */
+                //M_soll = -(K[0] * m_io->get_phi_bd() + K[1]*m_io->get_gz());
+                M_soll = -(K4[0] * m_io->get_phi_bd() + K4[1]*m_io->get_gz() + 
+                           K4[2] * m_io->get_vphi_fw()+ K4[3]*Integrator(0 - m_io->get_vphi_fw()) );
+                i_soll = M_soll/km;
+                m_io->write_current(i_soll);    
             }
         else if(vel_cntrl_enabled)
             {
-
+            i_soll = kp *(10-m_io->get_vphi_fw());
+            m_io->write_current(i_soll);    
             }
         else 
             {
@@ -60,10 +71,12 @@ float realtime_thread::est_angle(void)
 void realtime_thread::enable_vel_cntrl(void)
 {
     vel_cntrl_enabled = true;
+    bal_cntrl_enabled = false;
 }
 void realtime_thread::enable_bal_cntrl(void)
 {
     bal_cntrl_enabled = true;
+    vel_cntrl_enabled = false;
 }
 void realtime_thread::reset_cntrl(void)
 {

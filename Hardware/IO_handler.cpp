@@ -24,6 +24,7 @@ IO_handler::IO_handler(float Ts) : counter(PA_8, PA_9),
     fil_ax = IIR_filter(tau,Ts,1);
     fil_ay = IIR_filter(tau,Ts,1);
     fil_gz = IIR_filter(tau,Ts,tau);
+    diff = IIR_filter(1,Ts);
 
 }
 // Deconstructor
@@ -32,7 +33,7 @@ IO_handler::~IO_handler() {}
 void IO_handler::read_sensors_calc_speed(void)
 {
     phi_fw = uw(counter);
-    Vphi_fw = 0; //
+    Vphi_fw = diff(phi_fw); //
     //-------------- read imu ------------
     accx = ax2ax(imu.readAcc_raw(1));
     accy = ay2ay(-imu.readAcc_raw(0));
