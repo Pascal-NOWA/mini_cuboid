@@ -6,7 +6,7 @@
 sensors_actuators::sensors_actuators(float Ts) : di(2*Ts,Ts),counter(PA_8, PA_9),
                             i_enable(PB_1),button(PA_10),i_des(PA_4),uw(4*2048,16),spi(PA_12, PA_11, PA_1),imu(spi, PB_0)
 {
-    i2u.setup(-15,15,0.0f,1.0f);
+    i2u.setup(-4,4,0.0f,1.0f);
     ax2ax.setup(0,1,0,1);     // use these for first time, adapt values according 
     ay2ay.setup(0,1,0,1);     //              "
 
@@ -39,7 +39,9 @@ sensors_actuators::~sensors_actuators() {}
 void sensors_actuators::read_sensors_calc_speed(void)
 {
     phi_fw = uw(counter);
+    pos = phi_fw *0.01114;
     Vphi_fw = di(phi_fw);
+    vel = Vphi_fw * 0.01114;
     if(fabs(Vphi_fw) > MAX_FW_SPEED)
         {
         if(global_enable)
@@ -59,7 +61,7 @@ void sensors_actuators::read_sensors_calc_speed(void)
     
     // ------------------------------------
     //phi_bd = atan2(accx,accy);
-    phi_bd = uw2pi(atan2(accx,accy) + gyrz_fil - PI/4);
+    phi_bd = uw2pi(atan2(accx,accy) + gyrz_fil) -PI/2;
 
 }
 
@@ -81,17 +83,21 @@ void sensors_actuators::write_current(float _i_des)
         i_des = i2u(_i_des);   
 }
 
-float sensors_actuators::get_phi_fw(void)
+float sensors_actuators::get_pos(void)
 {
-    return phi_fw;
+    return pos;
 }
 float sensors_actuators::get_phi_bd(void)
 {
     return phi_bd;
 }
-float sensors_actuators::get_vphi_fw(void)
+float sensors_actuators::get_vel(void)
 {
-    return Vphi_fw;
+    return vel;
+}
+float sensors_actuators::get_vphi_bd(void)
+{
+    return gyrz;
 }
 float sensors_actuators::get_ax(void)
 {

@@ -19,12 +19,16 @@ public:
     void    reset(float initValue);
     void    setCoefficients(float P, float I, float D, float tau_f, float Ts, float uMin, float uMax);
     float   update(float e);
+    float   update_AWR(float e);
     float   saturate(float);
 
 
 private:
     float kp,ki,kd,tau_f,Ts,uMax,uMin,b01,a0;
     float Ipart,Dpart,e_old;
+    float ka = 1;
+    float u = 0;
+    float usat = 0;
 
 };
 

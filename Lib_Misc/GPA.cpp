@@ -223,7 +223,8 @@ GPA::GPA(float fMin, float fMax, int NfexcDes, int NperMin, int NmeasMin, float 
 // -----------------------------------------------------------------------------
 void GPA::setup(float fMin, float fMax, int NfexcDes, float Aexc0, float Aexc1, float Ts)
 {
-    doPrint = true;
+    doPrint = false;
+    this->Ts = Ts;
     int NperMin = 3;
     int NmeasMin = (int)ceil(1.0f/Ts);
     int Nstart = (int)ceil(3.0f/Ts);
@@ -231,6 +232,7 @@ void GPA::setup(float fMin, float fMax, int NfexcDes, float Aexc0, float Aexc1, 
     new_data_available = false;
     meas_is_finished = false;
     start_now = false;
+    status = 0;
 
     setParameters(fMin, fMax, NfexcDes, NperMin, NmeasMin, Ts, Aexc0, Aexc1, Nstart, Nsweep, doPrint);
 }
@@ -238,6 +240,14 @@ void GPA::setup(float fMin, float fMax, int NfexcDes, float Aexc0, float Aexc1, 
 // ------------------- deconstructor ---------------------
 GPA::~GPA() {}
 
+float GPA::get_Ts()
+{
+    return this->Ts;
+}
+uint8_t GPA::get_i()
+{
+    return (uint8_t)testpoint;
+}
 void GPA::setParameters(float fMin, float fMax, int NfexcDes, int NperMin, int NmeasMin, float Ts, float Aexc0, float Aexc1, int Nstart, int Nsweep, bool doPrint)
 {
     this->doPrint = doPrint;
@@ -262,8 +272,8 @@ void GPA::reset()
     fexc = 0.0;
     fexcPast = 0.0f;
     dfexcj = 0.0f;
-    i = 1; // iterating through desired frequency points
-    j = 1; // iterating through measurement points w.r.t. reachable frequency
+    f_iter = 1; // iterating through desired frequency points
+    j_iter = 1; // iterating through measurement points w.r.t. reachable frequency
     scaleG = 0.0;
     cr = 0.0;
     ci = 0.0;
@@ -289,6 +299,7 @@ void GPA::reset()
     gpaData.MeasPointFinished = false;
     gpaData.MeasFinished = false;
     gpaData.ind = -1;
+    status = 0;
 
 }
 
@@ -299,33 +310,32 @@ void GPA::reset()
 float GPA::update(float inp, float out)
 {
     // a new frequency point has been reached
-    if(j == 1) {
+    if(status != 2)
+        return 0;
+    if(j_iter == 1) {
         // user info
-        if(i == 1 && doPrint) {
-            printLine();
-            //printf("  fexc[Hz]    |Gyu|    deg(Gyu)  |Gyr|    deg(Gyr)   |U|       |Y|       |R|\r\n");
-            printLine();
+        if(f_iter == 1 ) {
             start_now = true;
-            //uart_com.send_char_data(250,2,0);
         }
         
         // get a new unique frequency point
         while(fexc == fexcPast) {
             // measurement finished
-            if(i > NfexcDes) {
+            if(f_iter > NfexcDes) {
                 gpaData.MeasPointFinished = false;
                 gpaData.MeasFinished = true;
                 meas_is_finished = true;
+                status = 0;
                 return 0.0f;
             }
-            calcGPAmeasPara(fexcDes[i - 1]);
+            calcGPAmeasPara(fexcDes[f_iter - 1]);
             // secure fexc is not higher or equal to nyquist frequency
-            if(fexc >= fnyq) {
+            if(fexc > fnyq) {
                 fexc = fexcPast;
             }
             // no frequency found
             if(fexc == fexcPast) {
-                i += 1;
+                f_iter += 1;
             } else {
                 Aexc = aAexcDes/fexc + bAexcDes;
                 pi2Tsfexc = pi2Ts*fexc;
@@ -344,8 +354,8 @@ float GPA::update(float inp, float out)
         gpaData.MeasPointFinished = false;
     }
     // perfomre the sweep or measure
-    if(j <= Nsweep_i) {
-        dfexcj = ((float)j - 1.0f)/((float)Nsweep_i - 1.0f);
+    if(j_iter <= Nsweep_i) {
+        dfexcj = ((float)j_iter - 1.0f)/((float)Nsweep_i - 1.0f);
         dfexcj = div12pi*sinf(pi4*dfexcj) - div812pi*sinf((float)pi2*dfexcj) + dfexcj;
         dfexc = fexcPast + (fexc - fexcPast)*dfexcj;
         AexcOut = AexcPast + (Aexc - AexcPast)*dfexcj;
@@ -362,9 +372,9 @@ float GPA::update(float inp, float out)
         sY[1] = sY[0];
     }
     // copy starting value for ang(R)
-    if(j == 1 || j == Nsweep_i + 1) sinargR = sinarg;
+    if(j_iter == 1 || j_iter == Nsweep_i + 1) sinargR = sinarg;
     // measurement of frequencypoint is finished
-    if(j == Nmeas + Nsweep_i) {
+    if(j_iter == Nmeas + Nsweep_i) {
         fexcPast = fexc;
         AexcPast = Aexc;
         Nsweep_i = Nsweep;
@@ -387,14 +397,16 @@ float GPA::update(float inp, float out)
         gpaData.MeasPointFinished = true;
         gpaData.ind++;
         // user info
+        testpoint = (uint8_t)f_iter +100;
+        new_data_available = true;
+        //printf("new_data_available = true;\r\n");
         if(doPrint) {
-            printf("%11.4e %9.3e %8.3f %9.3e %8.3f %9.3e %9.3e %9.3e\r\n", gpaData.fexc, gpaData.absGyu, gpaData.angGyu, gpaData.absGyr, gpaData.angGyr, gpaData.Umag, gpaData.Ymag, gpaData.Rmag);
-            //new_data_available = true;
+            //printf("%11.4e %9.3e %8.3f %9.3e %8.3f %9.3e %9.3e %9.3e\r\n", gpaData.fexc, gpaData.absGyu, gpaData.angGyu, gpaData.absGyr, gpaData.angGyr, gpaData.Umag, gpaData.Ymag, gpaData.Rmag);
         }
-        i += 1;
-        j = 1;
+        f_iter += 1;
+        j_iter = 1;
     } else {
-        j += 1;
+        j_iter += 1;
     }
     // calculate the excitation
     sinarg = fmod(sinarg + pi2Ts*dfexc, pi2);

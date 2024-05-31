@@ -59,6 +59,21 @@ float PID_Cntrl::update(float e)
    
 }
 
+float PID_Cntrl::update_AWR(float e)
+{
+    // the main update, PID Controller is discretized with bilinear/tustin (see Blatt 2, A1)
+    float Ppart = kp * e;
+    ka = 1;
+    Ipart = Ipart + ki * Ts/2.0f * (e + e_old) + ka * (u - usat);
+    Dpart = -a0 * Dpart + b01 * (e-e_old);
+    e_old = e;
+    
+    // AWR
+    u = Ppart + Ipart + Dpart;
+    usat = saturate(u);
+    return usat;
+}
+
 float PID_Cntrl::saturate(float x)
 {
 if(x > uMax)

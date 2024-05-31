@@ -10,6 +10,7 @@
 
 #define INIT 0
 #define IDLE 99
+#define TEST 98 // added nowa
 #define FLAT 1
 #define BALANCE 2
 #define WIGGLE_SLOW 3
@@ -46,6 +47,7 @@ private:
     ThreadFlag threadFlag;
     Timer lti;
     Timer gti;
+    float pi = 3.14159265359;
     float Ts;
     void sendSignal();
     sensors_actuators *m_sa;
