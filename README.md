@@ -1,2 +1,2 @@
-# mini_cuboid
-mini-cuboid for Nacht der technik July 2022 (dancing cubes)
+# Prototype seesaw version 2
+Code for seesaw includes added weight and auto home feature
